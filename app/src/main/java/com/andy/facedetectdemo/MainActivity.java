@@ -1,60 +1,103 @@
 package com.andy.facedetectdemo;
 
-import android.support.v7.app.AppCompatActivity;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.RectF;
 import android.os.Bundle;
-import android.util.Log;
+import android.support.v7.app.AppCompatActivity;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
+import android.widget.ProgressBar;
 
-import com.andy.facedetectdemo.api.FaceDetectAPI;
 import com.andy.facedetectdemo.model.DetectResult;
 import com.andy.facedetectdemo.model.FaceAttribute;
 import com.andy.facedetectdemo.model.FaceInfo;
 import com.andy.facedetectdemo.model.FacePosition;
+import com.andy.facedetectdemo.view.FaceView;
 
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.util.List;
 
-import retrofit.Callback;
-import retrofit.RestAdapter;
 import retrofit.RetrofitError;
 import retrofit.client.Response;
 
 public class MainActivity extends AppCompatActivity {
 
-    static final String API = "https://api.github.com";
-    private String pictureUrl ="http://n.sinaimg.cn/transform/20150918/xXlt-fxhytwp5414868.jpg";
+    FaceView faceView;
+    ProgressBar progressBar;
+
+    private FaceDetect.Callback detectCallback = new FaceDetect.Callback() {
+        @Override
+        public void onDetectCompleted(DetectResult result, Response response) {
+            List<FaceInfo> faceList = result.getFace();
+            if (faceList == null) return;
+
+            FaceInfo faceInfo = faceList.get(0);
+            FaceAttribute attribute =faceInfo.getFaceAttribute();
+            FacePosition position = faceInfo.getFacePosition();
+
+            String sex =attribute.getGender().getValue();
+            int age = attribute.getAge().getValue();
+
+            int imgWidth = result.getImgWidth();
+            int imgHeight = result.getImgHeight();
+            float profileWidth = position.getWidth();
+            float profileHeight = position.getHeight();
+            FacePosition.Point center = position.getCenter();
+
+            // 此处传的值均为相对图片的比例
+            RectF rectF = new RectF();
+            rectF.left = center.getX() - profileWidth/2;
+            rectF.top = center.getY() - profileHeight/2;
+            rectF.right = center.getX() + profileWidth/2;
+            rectF.bottom = center.getY() + profileHeight/2;
+
+            faceView.setInfo(sex + " " + age + "岁");
+            faceView.setProfile(rectF);
+            faceView.refresh();
+            progressBar.setVisibility(View.GONE);
+        }
+
+        @Override
+        public void onDetectFailed(RetrofitError error) {
+            faceView.setInfo("识别失败！");
+            faceView.refresh();
+            progressBar.setVisibility(View.GONE);
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        RestAdapter adapter = new RestAdapter.Builder().setEndpoint(FaceDetectAPI.API_URL).build();
-        FaceDetectAPI api = adapter.create(FaceDetectAPI.class);
+        faceView = (FaceView) findViewById(R.id.face_view);
+        progressBar = (ProgressBar) findViewById(R.id.progress);
+        progressBar.setVisibility(View.GONE);
 
-        api.getFaceInfo(FaceDetectAPI.API_KEY, FaceDetectAPI.API_SECRET, pictureUrl, new Callback<DetectResult>() {
+        findViewById(R.id.start).setOnClickListener(new View.OnClickListener() {
             @Override
-            public void success(DetectResult result, Response response) {
-                Log.d("TAG", "-----------------SUCCESS-------------------");
-                Log.d("TAG", "url-->" + result.getUrl());
-                Log.d("TAG", "img_id-->" + result.getImgId());
-                FaceInfo info  = (FaceInfo)result.getFace().get(0);
-                FaceAttribute attribute = info.getFaceAttribute();
-                int age = attribute.getAge().getValue();
-                double d = attribute.getGender().getConfidence();
-
-                Log.d("TAG", "age-->" + info.getFaceAttribute().getAge().getValue());
-                Log.d("TAG", "confidence-->" + d);
-
-                FacePosition.Point point = info.getFacePosition().getCenter();
-                Log.d("TAG", "face center pos--> x : "+point.getX() + "; y : "+point.getY());
-
-            }
-
-            @Override
-            public void failure(RetrofitError error) {
-                Log.d("TAG", "ERROR-->"+error);
+            public void onClick(View view) {
+                progressBar.setVisibility(View.VISIBLE);
+                String path = getExternalCacheDir().getPath();
+                File file = new File(path,"image");
+                try {
+                    BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(file));
+                    Bitmap bitmap = BitmapFactory.decodeResource(getResources(), R.drawable.image);
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 100, bos);
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
+                }
+                FaceDetect faceDetect = new FaceDetect();
+                faceDetect.detect(file, detectCallback);
             }
         });
+
+
 
 
     }

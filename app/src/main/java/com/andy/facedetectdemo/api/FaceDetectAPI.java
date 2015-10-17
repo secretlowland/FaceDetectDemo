@@ -1,16 +1,17 @@
 package com.andy.facedetectdemo.api;
 
 import com.andy.facedetectdemo.model.DetectResult;
-import com.andy.facedetectdemo.model.FaceInfo;
-
-import org.bouncycastle.asn1.cms.PasswordRecipientInfo;
 
 import retrofit.Callback;
 import retrofit.http.GET;
-import retrofit.http.Path;
+import retrofit.http.Multipart;
+import retrofit.http.POST;
+import retrofit.http.Part;
 import retrofit.http.Query;
+import retrofit.mime.TypedFile;
 
 /**
+ * 获取图片识别信息的接口
  * Created by lxn on 2015/10/17.
  */
 public interface FaceDetectAPI {
@@ -26,4 +27,15 @@ public interface FaceDetectAPI {
             @Query("url") String url,
             Callback<DetectResult> callback
             );
+
+    @Multipart
+    @POST("/detection/detect")
+    public void getFaceInfo(
+            @Query("api_key") String apiKey,
+            @Query("api_secret") String apiSecret,
+            @Part("img") TypedFile file,
+            Callback<DetectResult> callback
+            );
+
+
 }
